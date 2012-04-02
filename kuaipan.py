@@ -11,11 +11,15 @@ import requests
 import string
 import time
 
+app_name = 'python-sdk'
 consumer_key = 'xcpFXnjDjb1b8QHJ'
 consumer_secret = 'Stn7uJjh3l4pTcTn'
 oauth_token = ''
 oauth_token_secret = ''
 oauth_verifier = ''
+
+root = 'app_folder' #app_folder or kuaipan
+filename = ''
 
 # define the version of api
 # used in some URLs
@@ -27,64 +31,56 @@ API_VERSION = '1'
 #
 API_REQUEST_TOKEN = {
     'http_method': 'GET',
-    'url': 'https://openapi.kuaipan.cn/open/requestToken',
-    'param': {}
+    'url': 'https://openapi.kuaipan.cn/open/requestToken'
 }
 API_AUTHORIZE = {
-    'http_method': 'GET',
-    'url': 'https://www.kuaipan.cn/api.php',
-    'param': {'oauth_token': oauth_token, 'ac': 'open', 'op': 'authorise'}
+    'http_method': 'POST',
+    'url': 'https://www.kuaipan.cn/api.php?ac=open&op=authorisecheck'
 }
 API_ACCESS_TOKEN = {
     'http_method': 'GET',
-    'url': 'https://openapi.kuaipan.cn/open/accessToken',
-    'param': {'oauth_token': oauth_token, 'oauth_verifier': oauth_verifier}
+    'url': 'https://openapi.kuaipan.cn/open/accessToken'
 }
 API_ACCOUNT_INFO = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/account_info',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/account_info'
     
 }
 API_METADATA = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/metadata/',
-    'param': {'oauth_token': oauth_token} # + <root>/<path>
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/metadata/' + root + '/'
 }
 API_SHARES = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/shares/',
-    'param': {'oauth_token': oauth_token}  # + <root>/<path>
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/shares/' + root + '/'
 } 
 API_CREATE_FOLDER = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/create_folder',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/create_folder'
 }
 API_DELETE = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/delete',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/delete'
 }
 API_MOVE = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/move',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/move'
 }
 API_COPY = {
     'http_method': 'GET',
-    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/copy',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://openapi.kuaipan.cn/' + API_VERSION + '/fileops/copy'
 }
 API_UPLOAD_LOCATE = {
     'http_method': 'GET',
-    'url': 'http://api-content.dfs.kuaipan.cn/' + API_VERSION + '/fileops/upload_locate',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://api-content.dfs.kuaipan.cn/' + API_VERSION + '/fileops/upload_locate'
+}
+API_UPLOAD_FILE = {
+    'http_method': 'POST',
+    'url': '/' + API_VERSION + '/fileops/upload_file'
 }
 API_DOWNLOAD_FILE = {
     'http_method': 'GET',
-    'url': 'http://api-content.dfs.kuaipan.cn/' + API_VERSION + '/fileops/download_file',
-    'param': {'oauth_token': oauth_token}
+    'url': 'http://api-content.dfs.kuaipan.cn/' + API_VERSION + '/fileops/download_file'
 }
 
 #############################################################
@@ -186,61 +182,212 @@ def GenReqStr(url, param):
     
     return request_url
 
+def ParseJSON(data):
+    ret = json.loads(data)
+    return ret
+
 # used by CallAPI()
 # http request and response , return a unicode dict, need to str() before use
 #
-def Req(http_method, url):
-    response = requests.get(url).raw
-    data = json.load(response)
+def Req(http_method, url, postdata):
+    if(http_method == 'GET'):
+        response = requests.get(url)
+    elif(http_method == 'POST'):
+        response = requests.post(url, postdata)
 
-    return data
+    # return the data as a dict
+    ret = response.content
+    return ret
 
 # used by all API calls
+# the 'param' parameter is a dict() 
 # we will add a callback parameters in the future
 #
-def CallAPI(api, op_param):
+def CallAPI(api, data):
     http_method = api['http_method']
     url = api['url']
-    param = api['param']
+    
+    print url
 
-    request_url = GenReqStr(url, param)
-    signature = GenSignature(http_method, request_url, consumer_secret, oauth_token_secret)
-    request_url += 'oauth_signature=' + signature
-    ret = Req('GET', request_url)
+    if(http_method == 'POST'):
+        ret = Req(http_method, url, data)
+    elif(http_method == 'GET'):
+        request_url = GenReqStr(url, data)
+        signature = GenSignature(http_method, request_url, consumer_secret, oauth_token_secret)
+        request_url += 'oauth_signature=' + signature
+        ret = Req(http_method, request_url, '')
 
     return ret
 
 # get temperory token and token_secret
 #
 def RequestToken():
-    result = CallAPI(API_REQUEST_TOKEN, '')
-    #return result['oauth_token'], result['oauth_token_secret']
-    return result
+    data = CallAPI(API_REQUEST_TOKEN, {})
+    ret = ParseJSON(data)
 
-# get the oauth_verifier used for 
+    return ret
+
+# get the oauth_verifier used for AccessToken()
+# this is a tricky implementation, need to be fixed
 #
-def Authorize():
-    result = CallAPI(API_AUTHORIZE, '')
+def Authorize(appname, username, password):
+    param = {'oauth_token': oauth_token, 'username': username, 'userpwd': password, 'app_name': appname}
+    data = CallAPI(API_AUTHORIZE, param)
+    # tricks to get the oauth_verifier
+    start = data.find('<strong>') + 8
+    end = data.find('</strong>')
+    ret = data[start:end]
 
-    return result['oauth_verifier']
+    return ret
 
 # get access token ( by using previously got temperory token)
-#
-def AccessToken():
-    result = CallAPI(API_ACCESS_TOKEN, '')
-    #return result['oauth_token'], result['oauth_token_secret']
-    return result
+# return a page = = maybe we need to do some tricks to retrive the oauth_verifier
+def GetAccessToken():
+    param = {'oauth_token': oauth_token, 'oauth_verifier': oauth_verifier}
+    data = CallAPI(API_ACCESS_TOKEN, param)
+    ret = ParseJSON(data)
 
-def GetToken():
+    return ret
+
+#
+#
+def GetAccountInfo():
+    param = {'oauth_token': oauth_token}
+    data = CallAPI(API_ACCOUNT_INFO, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+# more parameters should be available to users to be tuned 
+def GetMetadata(filename):
+    API_METADATA['url'] += filename
+    
+    param = {'oauth_token': oauth_token}
+    data = CallAPI(API_METADATA, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+# 
+def Shares(filename):
+    API_SHARES['url'] += filename
+    
+    param = {'oauth_token': oauth_token}
+    data = CallAPI(API_SHARES, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+#
+def Create(filename):    
+    param = {'oauth_token': oauth_token, 'root': root, 'path': filename}
+    data = CallAPI(API_CREATE_FOLDER, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+#
+def Delete(filename):    
+    param = {'oauth_token': oauth_token, 'root': root, 'path': filename}
+    data = CallAPI(API_DELETE, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+#
+def Move(src, dest):    
+    param = {'oauth_token': oauth_token, 'root': root, 'from_path': src, 'to_path': dest}
+    data = CallAPI(API_MOVE, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+#
+def Copy(src, dest):    
+    param = {'oauth_token': oauth_token, 'root': root, 'from_path': src, 'to_path': dest}
+    data = CallAPI(API_COPY, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+#
+def GetUploadURL(ip):
+    if(ip == ''):
+        param = {'oauth_token': oauth_token}
+    else:
+        param = {'oauth_token': oauth_token, 'source_ip': ip} 
+    data = CallAPI(API_UPLOAD_LOCATE, param)
+    ret = ParseJSON(data)
+    
+    return ret
+
+#
+#
+#def Upload(ip, overwrite, file, filename):
+#    url = GetUploadURL(ip)
+#    url += API_UPLOAD_FILE['url']
+#    http_method = API_UPLOAD_FILE['http_method']
+    
+#    param = {'oauth_token': oauth_token, 'overwrite': overwrite, 'file': file}
+    
+#    data = 
+
+def Download(filename):
+    param = {'oauth_token': oauth_token, 'root': root, 'path': filename}
+    data = CallAPI(API_DOWNLOAD_FILE, param)
+    
+    return data
+
+def test():
     global oauth_token
     global oauth_token_secret
+    global charged_dir
+    #global oauth_verifier
 
-    ret = RequestToken()
-    oauth_token = str(ret['oauth_token'])
-    print oauth_token + '\n'
-    oauth_token_secret = str(ret['oauth_token_secret'])
-    oauth_verifier = Authorize()
-    ret = AccessToken()
-    oauth_token = str(ret['oauth_token'])
-    print oauth_token + '\n'
-    oauth_token_secret = str(ret['oauth_token_secret'])
+    data = RequestToken()
+    print data
+    oauth_token = str(data['oauth_token'])
+    oauth_token_secret = str(data['oauth_token_secret'])
+    
+    oauth_verifier = str(Authorize(app_name, 'patriot7@live.cn', 'a55n0lE?')) # username and password shoule be retrived by user input
+    print oauth_verifier
+    
+    data = GetAccessToken()
+    oauth_token = str(data['oauth_token'])
+    oauth_token_secret = str(data['oauth_token_secret'])
+    user_id = str(data['user_id'])
+    charged_dir = str(data['charged_dir'])
+    
+    data = GetAccountInfo()
+    print data
+    
+    data = GetMetadata('kuaipan.file')
+    print data
+    
+    data = Shares('kuaipan.file')
+    print data
+    
+    data = Create('delete/')
+    print data
+    
+    data = Move('kuaipan.file', 'kuaipan.anotherfile')
+    print data
+    
+    data = Copy('kuaipan.anotherfile', 'kuaipan.copy')
+    print data
+    
+    data = Delete('kuaipan.anotherfile')
+    print data
+    
+    data = GetUploadURL('')
+    print data
+    
+    data = Download('kuaipan.copy')
+    print data
