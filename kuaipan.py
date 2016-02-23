@@ -11,9 +11,9 @@ import requests
 import string
 import time
 
-app_name = 'python-sdk'
-consumer_key = 'xcpFXnjDjb1b8QHJ'
-consumer_secret = 'Stn7uJjh3l4pTcTn'
+app_name = ''
+consumer_key = ''
+consumer_secret = ''
 oauth_token = ''
 oauth_token_secret = ''
 oauth_verifier = ''
